@@ -3,51 +3,35 @@ __author__ = "Praveen Gupta"
 
 import numpy as np
 from priorityDict import priorityDictionary
+import sys
 class Navigation(object):
 
-	def __init__(self):
+	def __init__(self, noOfRoads,names,radii,intersections,noOfIntersctn, intersectionPositions, start,startPoint,direction,end,endPoint):
 
-		self.noOfRoads=0
-		self.name=[]
+		self.noOfRoads=noOfRoads
+		self.name=names
 		self.radius={} #dictionary of roads and corresponding radii
-		self.noOfIntersctn=0
-		self.intersctn={}
+		self.intersections=[]
+		self.intersctn={}#dictionary to store each road connects which road on which point
+		for i,x in enumerate(self.name):
+			self.radius[x]=int(radii[i])
+			self.intersections=int(intersections[i])
+			self.intersctn[x]={}
+
+		self.noOfIntersctn=noOfIntersctn
+		
+		for x in intersectionPositions:
+			self.intersctn[x[0]].update({x[2]:int(x[1])})
+
+		self.start=start
+		self.startPoint=int(startPoint)
+		self.direction=direction
+		self.end=end
+		self.endPoint=int(endPoint)
+		
 		self.commands=[]
 		self.totalTime=0
-
-	def get_input(self):
-
-		self.noOfRoads= int(raw_input("Enter number of Roads "))
-		print "Enter road, radius and number of Intersections "
-		no = np.zeros(5 ,dtype=np.int)
-		self.name = [0]*self.noOfRoads
-		
-		for i in range(self.noOfRoads):
-			self.name[i] = raw_input("enter name ")
-			radi = int(raw_input("enter radius "))
-			no[i] = int(raw_input("enter number of Intersections "))
-			self.radius[self.name[i]] = radi
-			self.intersctn[self.name[i]]={}
-
-
-		self.noOfIntersctn = int(raw_input("Enter total number of intersections "))
-		print "Enter the intersection details in order of specified format\n Road Name 1: first point of Intersection: Road Name 2: second point of Intersection "
-		k=1
-		for i in self.name:
-			if k<=self.noOfIntersctn:
-				for j in range(no[self.name.index(i)]):
-					print "Intersection No "+str(k)
-					strtRoad=raw_input()
-					strtpt = raw_input()
-					endRoad = raw_input()
-					endpt=raw_input()
-					self.intersctn[strtRoad].update({endRoad:strtpt}) #converting airport to graph
-					k+=1
-			else:
-				print "Your number of Intersections don't tally"
-				return
-					
-
+			
 	def display(self):
 
 		print "Roads and their radii"
@@ -58,7 +42,7 @@ class Navigation(object):
 
 	#implementation
 
-	def Dijkstra(self, start, startPoint, end, endPoint,direction):
+	def Dijkstra(self):
 
 		distances={}
 		individual_dist={}
@@ -66,9 +50,8 @@ class Navigation(object):
 		path={}
 		final_dist = {}	# dictionary of final distances
 		Q = priorityDictionary()  # distances of non final predecessors
-		Q[start] = 0
+		Q[self.start] = 0
 		visited=[]
-		mainDirection=direction
 
 		for road in Q:
 			if road in distances:
@@ -80,25 +63,21 @@ class Navigation(object):
 			final_dist[road] = Q[road]
 			if road in reverse:
 				if reverse[road]==0.3:
-					if direction == '+':
-						direction=='-'
+					if self.direction == '+':
+						self.direction=='-'
 					else:
-						direction=='+'
+						self.direction=='+'
 
 			for neighbour in self.intersctn[road]:
-
-				if road==end:
+				if road==self.end:
 					starting=self.intersctn[neighbour][road]
-					ending=endPoint
-				elif road==start:
-					starting=startPoint
-					ending=self.intersctn[road][neighbour]
+					ending=self.endPoint
 				else:
 					starting=self.intersctn[road][neighbour]
 					ending=self.intersctn[neighbour][road]
 				if neighbour in visited or starting == ending:
 						continue
-				dist,reverseTime= self.calcDist(road, starting,ending,direction)
+				dist,reverseTime= self.calcDist(road, starting,neighbour, ending,self.direction)
 				totalDist = final_dist[road] + dist
 				
 				if neighbour not in Q or (totalDist <= Q[neighbour] ):
@@ -106,29 +85,28 @@ class Navigation(object):
 					path[neighbour] = road
 					reverse[neighbour]=reverseTime
 					distances[neighbour]=dist+reverseTime
-					if road==start:
-						reverse[start]=reverseTime
-						distances[road]=totalDist
+					if road==self.start:
+						distances[self.start],reverse[self.start]=self.calcDist(self.start,self.startPoint,neighbour,self.intersctn[self.start][neighbour],self.direction)
 			if len(visited)==self.noOfRoads: 
 				break
 		return (distances,path,reverse)
 
-	def shortestPath(self,start,startPoint,end,endPoint,direction):
+	def shortestPath(self):
 
-		D,P,R= self.Dijkstra(start,startPoint,end,endPoint,direction)
+		D,P,R= self.Dijkstra()
 		Path = []
 		reverse=[]
 		while 1:
-			Path.append(R[end])
-			Path.append(end)
+			Path.append(R[self.end])
+			Path.append(self.end)
 
-			if end == start: break
-			end = P[end]
+			if self.end == self.start: break
+			self.end = P[self.end]
 		Path.reverse()
 		return D,Path,
 
-	def convertPathToTime(self,start,startPoint,end,endPoint,direction):
-		distances, path = self.shortestPath(start,startPoint,end,endPoint,direction)
+	def convertPathToTime(self):
+		distances, path = self.shortestPath()
 		totalTime=0
 		
 		for i in range(0,len(path)):
@@ -142,7 +120,7 @@ class Navigation(object):
 				time = self.calcTime(dist,1)#(-8) to account for deacceleration
 				self.appendCommands("GO",time)
 				if i!=len(path)-2:
-					self.appendCommands("TRANSFER "+path[i],0.1)
+					self.appendCommands("TRANSFER "+path[i+2],0.1)
 
 	def calcTime(self,dist,flag):
 		#flag is used to denote if acceleration is required
@@ -157,12 +135,13 @@ class Navigation(object):
 		time += dist/4 #max velocity mentioned is 4 m/s
 		return time
 
-	def calcDist(self,start, position, destination,direction):
+	def calcDist(self,start, position, end, destination,direction):
 		position = int(position)
 		destination= int(destination)
 		angle=0
 		flag=True
 		time=0
+
 		#check if its in anticlockwise motion
 		if direction == '-':
 			flag = False
@@ -177,7 +156,10 @@ class Navigation(object):
 			else:
 				angle = abs(diff)
 		elif diff == 180 or diff == 0:
-			angle = abs(diff)
+			if start==end:
+				angle=0
+			else:
+				angle = 180
 			time=0
 		else:
 			if flag==False:
@@ -196,20 +178,40 @@ class Navigation(object):
 
 
 if __name__ == "__main__":
+	file_name= raw_input("enter file name ")
+	input_file=open(file_name,'r')
+	given_input=input_file.read().splitlines()
+	noOfRoads=int(given_input[0].strip())
+	names=[0]*noOfRoads
+	radii=[0]*noOfRoads
+	intersections=[0]*noOfRoads
 	
-	choice = 'y'
-	while choice == 'y':
-		obj = Navigation()
-		obj.get_input()
-		start = raw_input("Enter Starting Road ")
-		startPoint = int(raw_input("Enter Starting Position "))
-		direction = raw_input("Enter + for clockwise, - for anti clockwise ")
-		end = raw_input("Enter Ending Road ")
-		endPoint =  int(raw_input("Enter End Point "))
-		obj.display()
-		print obj.convertPathToTime(start,startPoint,end,endPoint,direction)
-		print "Commands"
-		print obj.commands
-		print "TOTAL TIME"
-		print round(obj.totalTime,1)
-		choice = raw_input("To continue press 'y'")
+	for i in range(1,noOfRoads+1):
+		line=given_input[i].strip().split(' ')
+		names[i-1]=line[0]
+		radii[i-1]=line[1]
+		intersections[i-1]=line[2]
+
+	noOfIntersctn=int(given_input[noOfRoads+2].strip())
+
+	intersectionPositions=[]
+	for i in range(noOfRoads+3,noOfIntersctn+noOfRoads+3):
+		line=given_input[i].strip().split(' ')
+		intersectionPositions.append(line)
+	line=given_input[-2].strip().split(' ')
+	start=line[0]
+	startPoint=line[1]
+	direction=line[2]
+	line=given_input[-1].strip().split(' ')
+	end=line[0]
+	endPoint=line[1]
+
+	print intersections
+	obj = Navigation(noOfRoads,names,radii,intersections,noOfIntersctn,intersectionPositions,start,startPoint,direction,end,endPoint)
+	#obj = Navigation(5,['a','b','c','d','e'],[2500,1000,1000,1000,3500,4500],[3,3,3,4,3],16,[['a',0,'b',180],['a',0,'d',0],['a',180,'c',0],['b',0,'e',0],['b',180,'a',0],['b',180,'d',0],['c',0,'a',180],['c',180,'d',180],['c',180,'e',180],['d',0,'a',0],['d',0,'b',180],['d',180,'c',180],['d',180,'e',180],['e',0,'b',0],['e',180,'c',180],['e',180,'d',180]], 'a',355,'+','b',0)
+	obj.display()
+	print obj.convertPathToTime()
+	print "Commands"
+	print obj.commands
+	print "TOTAL TIME"
+	print round(obj.totalTime,1)
